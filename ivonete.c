@@ -1,118 +1,92 @@
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/*
-    Trabalho Academico em Linguagem C
-    Tema: Simulador de Organizacao Financeira, Investimentos e Rebalanceamento
-
-    Requisitos tecnicos atendidos:
-    1. Estruturas Condicionais: if/else e switch.7
-
-    2. Estruturas de Repeticao: for, while e do/while.
-    3. Modularizacao: funcoes separadas para menu, cadastro, calculos e relatorios.
-    4. Estruturas de Dados: vetores e matrizes para nomes, gastos, valores e metas.
-*/
-
-#define TAM_NOME 50
-#define MAX_ATIVOS 10
-#define QTD_GASTOS 7
-#define EPSILON 0.01
+#define MAX_GASTOS 7
+#define MAX_ATIVOS 6
+#define TAM_LINHA 120
 
 typedef struct {
-    char nome[TAM_NOME];
+    char nome[80];
     int idade;
-    double salario;
-    double gastos[QTD_GASTOS];
-    double economiaMensal;
-    int configurado;
-} Usuario;
+    double rendaMensal;
+    double gastos[MAX_GASTOS];
+    double totalGastos;
+    double sobraInvestir;
+    int preenchido;
+} Orcamento;
 
-typedef struct { 
-    int quantidade;
-    char nomes[MAX_ATIVOS][TAM_NOME];
-    double valores[MAX_ATIVOS];
-    double metas[MAX_ATIVOS];
-    int configurada;
+typedef struct {
+    char nomes[MAX_ATIVOS][80];
+    double precos[MAX_ATIVOS];
+    double quantidades[MAX_ATIVOS];
+    double valoresAtuais[MAX_ATIVOS];
+    double pesos[MAX_ATIVOS];
+    int preenchida;
 } Carteira;
-
-const char categoriasGastos[QTD_GASTOS][TAM_NOME] = {
-    "Moradia",
-    "Alimentacao",
-    "Transporte",
-    "Saude",
-    "Educacao",
-    "Lazer",
-    "Outros"
-};
 
 void limparTela(void);
 void pausar(void);
-void removerQuebraLinha(char texto[]);
-void trocarVirgulaPorPonto(char texto[]);
-int lerInteiro(const char mensagem[], int minimo, int maximo);
-double lerDouble(const char mensagem[], double minimo);
-void lerTexto(const char mensagem[], char texto[], int tamanho);
-
 int menuPrincipal(void);
-void carregarExemplo(Usuario *usuario, Carteira *carteira);
-void cadastrarUsuario(Usuario *usuario);
-void cadastrarCarteira(Carteira *carteira);
-void exibirDiagnosticoFinanceiro(const Usuario *usuario, const Carteira *carteira);
-void exibirRelatorioRebalanceamento(const Carteira *carteira);
-void simularQueda(Carteira *carteira);
-void exibirRequisitosAcademicos(void);
-
-double calcularTotalGastos(const Usuario *usuario);
-double calcularSaldoMensal(const Usuario *usuario);
-double calcularTotalCarteira(const Carteira *carteira);
-void calcularRebalanceamento(const Carteira *carteira, double diferencas[]);
-int metasSomam100(const Carteira *carteira);
-int escolherAtivo(const Carteira *carteira);
+int lerInteiroFaixa(const char *mensagem, int minimo, int maximo);
+double lerDoubleMinimo(const char *mensagem, double minimo, int permiteIgual);
+void lerTextoObrigatorio(const char *mensagem, char *destino, size_t tamanho);
+void inicializarCarteira(Carteira *carteira);
+void cadastrarOrcamento(Orcamento *orcamento, const char categorias[MAX_GASTOS][30]);
+void escolherPesos(Carteira *carteira);
+void definirPerfilAutomatico(Carteira *carteira, int perfil);
+void definirPesosManuais(Carteira *carteira);
+double somarPesos(const Carteira *carteira);
+void cadastrarCarteiraAtual(Carteira *carteira);
+void exibirResumo(const Orcamento *orcamento, const Carteira *carteira, const char categorias[MAX_GASTOS][30]);
+void simularRebalanceamento(const Orcamento *orcamento, const Carteira *carteira);
+void exibirAjudaInvestimentos(void);
+double valorAbsoluto(double valor);
 
 int main(void) {
-    Usuario usuario = {0};
-    Carteira carteira = {0};
+    const char categorias[MAX_GASTOS][30] = {
+        "Moradia",
+        "Alimentacao",
+        "Transporte",
+        "Saude",
+        "Educacao",
+        "Lazer",
+        "Outros"
+    };
+
+    Orcamento orcamento = {0};
+    Carteira carteira;
     int opcao;
 
-    carregarExemplo(&usuario, &carteira);
+    inicializarCarteira(&carteira);
 
     do {
-        limparTela();
         opcao = menuPrincipal();
 
         switch (opcao) {
             case 1:
-                cadastrarUsuario(&usuario);
+                cadastrarOrcamento(&orcamento, categorias);
                 break;
             case 2:
-                cadastrarCarteira(&carteira);
+                escolherPesos(&carteira);
                 break;
             case 3:
-                exibirDiagnosticoFinanceiro(&usuario, &carteira);
+                cadastrarCarteiraAtual(&carteira);
                 break;
             case 4:
-                exibirRelatorioRebalanceamento(&carteira);
+                exibirResumo(&orcamento, &carteira, categorias);
                 break;
             case 5:
-                simularQueda(&carteira);
-                break;
-            case 6:
-                carregarExemplo(&usuario, &carteira);
-                printf("\nDados de exemplo carregados com sucesso.\n");
-                pausar();
-                break;
-            case 7:
-                exibirRequisitosAcademicos();
+                exibirAjudaInvestimentos();
                 break;
             case 0:
-                printf("\nPrograma encerrado. Organize seu dinheiro antes de investir!\n");
+                limparTela();
+                printf("Obrigado por usar o simulador. Bons estudos e bons investimentos!\n");
                 break;
             default:
-                printf("\nOpcao invalida.\n");
+                printf("Entrada invalida.\n");
                 pausar();
                 break;
         }
@@ -130,495 +104,465 @@ void limparTela(void) {
 }
 
 void pausar(void) {
-    char entrada[8];
+    char linha[TAM_LINHA];
 
     printf("\nPressione ENTER para continuar...");
-    fgets(entrada, sizeof(entrada), stdin);
+    fgets(linha, sizeof(linha), stdin);
 }
 
-void removerQuebraLinha(char texto[]) {
-    texto[strcspn(texto, "\n")] = '\0';
+int menuPrincipal(void) {
+    limparTela();
+    printf("============================================================\n");
+    printf(" SIMULADOR DE CARTEIRA DE INVESTIMENTOS E REBALANCEAMENTO\n");
+    printf("============================================================\n");
+    printf("1 - Informar ganho mensal e gastos\n");
+    printf("2 - Definir pesos percentuais da carteira\n");
+    printf("3 - Informar valores que ja tenho investidos\n");
+    printf("4 - Ver resumo, sobra para investir e rebalanceamento\n");
+    printf("5 - Ajuda para leigos: tipos de investimento\n");
+    printf("0 - Sair\n");
+    printf("============================================================\n");
+
+    return lerInteiroFaixa("Escolha uma opcao: ", 0, 5);
 }
 
-void trocarVirgulaPorPonto(char texto[]) {
-    int i;
-
-    for (i = 0; texto[i] != '\0'; i++) {
-        if (texto[i] == ',') {
-            texto[i] = '.';
-        }
-    }
-}
-
-int lerInteiro(const char mensagem[], int minimo, int maximo) {
-    char entrada[80];
-    char extra;
-    int numero;
-
-    while (1) {
-        printf("%s", mensagem);
-
-        if (fgets(entrada, sizeof(entrada), stdin) == NULL) {
-            printf("Entrada invalida. Tente novamente.\n");
-            clearerr(stdin);
-            continue;
-        }
-
-        if (sscanf(entrada, " %d %c", &numero, &extra) != 1) {
-            printf("Entrada invalida. Digite apenas numeros inteiros.\n");
-            continue;
-        }
-
-        if (numero < minimo || numero > maximo) {
-            printf("Valor fora do intervalo permitido (%d a %d).\n", minimo, maximo);
-            continue;
-        }
-
-        return numero;
-    }
-}
-
-double lerDouble(const char mensagem[], double minimo) {
-    char entrada[80];
+int lerInteiroFaixa(const char *mensagem, int minimo, int maximo) {
+    char linha[TAM_LINHA];
     char *fim;
-    double numero;
+    long valor;
 
     while (1) {
         printf("%s", mensagem);
 
-        if (fgets(entrada, sizeof(entrada), stdin) == NULL) {
+        if (fgets(linha, sizeof(linha), stdin) == NULL) {
             printf("Entrada invalida. Tente novamente.\n");
             clearerr(stdin);
             continue;
         }
 
-        trocarVirgulaPorPonto(entrada);
-        numero = strtod(entrada, &fim);
+        errno = 0;
+        valor = strtol(linha, &fim, 10);
 
         while (isspace((unsigned char)*fim)) {
             fim++;
         }
 
-        if (fim == entrada || *fim != '\0') {
-            printf("Entrada invalida. Digite um numero valido.\n");
+        if (fim == linha || *fim != '\0' || errno == ERANGE) {
+            printf("Entrada invalida. Digite apenas numeros inteiros.\n");
             continue;
         }
 
-        if (numero < minimo) {
-            printf("Valor invalido. O minimo permitido e %.2f.\n", minimo);
+        if (valor < minimo || valor > maximo) {
+            printf("Entrada invalida. Digite um valor entre %d e %d.\n", minimo, maximo);
             continue;
         }
 
-        return numero;
+        return (int)valor;
     }
 }
 
-void lerTexto(const char mensagem[], char texto[], int tamanho) {
-    do {
+double lerDoubleMinimo(const char *mensagem, double minimo, int permiteIgual) {
+    char linha[TAM_LINHA];
+    char *fim;
+    double valor;
+    int valorValido;
+
+    while (1) {
         printf("%s", mensagem);
 
-        if (fgets(texto, tamanho, stdin) == NULL) {
+        if (fgets(linha, sizeof(linha), stdin) == NULL) {
             printf("Entrada invalida. Tente novamente.\n");
             clearerr(stdin);
-            texto[0] = '\0';
             continue;
         }
 
-        removerQuebraLinha(texto);
+        errno = 0;
+        valor = strtod(linha, &fim);
 
-        if (strlen(texto) == 0) {
-            printf("O campo nao pode ficar vazio.\n");
+        while (isspace((unsigned char)*fim)) {
+            fim++;
         }
-    } while (strlen(texto) == 0);
+
+        valorValido = permiteIgual ? (valor >= minimo) : (valor > minimo);
+
+        if (fim == linha || *fim != '\0' || errno == ERANGE || !valorValido) {
+            if (permiteIgual) {
+                printf("Entrada invalida. Digite um numero maior ou igual a %.2f.\n", minimo);
+            } else {
+                printf("Entrada invalida. Digite um numero maior que %.2f.\n", minimo);
+            }
+            continue;
+        }
+
+        return valor;
+    }
 }
 
-int menuPrincipal(void) {
-    printf("============================================================\n");
-    printf("       SIMULADOR FINANCEIRO E DE INVESTIMENTOS\n");
-    printf("============================================================\n");
-    printf("1 - Cadastrar dados pessoais e gastos mensais\n");
-    printf("2 - Cadastrar carteira de investimentos e metas\n");
-    printf("3 - Ver diagnostico financeiro mensal\n");
-    printf("4 - Gerar relatorio de rebalanceamento\n");
-    printf("5 - Simular queda de um investimento\n"); 
-    printf("6 - Carregar exemplo para demonstracao\n");
-    printf("7 - Ver requisitos academicos usados\n");
-    printf("0 - Sair\n");
-    printf("============================================================\n");
+void lerTextoObrigatorio(const char *mensagem, char *destino, size_t tamanho) {
+    char linha[TAM_LINHA];
+    char *inicio;
+    char *fim;
 
-    return lerInteiro("Escolha uma opcao: ", 0, 7);
+    while (1) {
+        printf("%s", mensagem);
+
+        if (fgets(linha, sizeof(linha), stdin) == NULL) {
+            printf("Entrada invalida. Tente novamente.\n");
+            clearerr(stdin);
+            continue;
+        }
+
+        linha[strcspn(linha, "\n")] = '\0';
+        inicio = linha;
+
+        while (isspace((unsigned char)*inicio)) {
+            inicio++;
+        }
+
+        fim = inicio + strlen(inicio);
+        while (fim > inicio && isspace((unsigned char)*(fim - 1))) {
+            fim--;
+        }
+        *fim = '\0';
+
+        if (strlen(inicio) == 0) {
+            printf("Entrada invalida. O nome nao pode ficar vazio.\n");
+            continue;
+        }
+
+        if (tamanho > 0) {
+            strncpy(destino, inicio, tamanho - 1);
+            destino[tamanho - 1] = '\0';
+        }
+
+        return;
+    }
 }
 
-void carregarExemplo(Usuario *usuario, Carteira *carteira) {
-    strcpy(usuario->nome, "Aluno Visitante");
-    usuario->idade = 20;
-    usuario->salario = 3000.00;
-    usuario->gastos[0] = 900.00;
-    usuario->gastos[1] = 600.00;
-    usuario->gastos[2] = 250.00;
-    usuario->gastos[3] = 150.00;
-    usuario->gastos[4] = 200.00;
-    usuario->gastos[5] = 200.00;
-    usuario->gastos[6] = 200.00;
-    usuario->economiaMensal = 500.00;
-    usuario->configurado = 1;
+void inicializarCarteira(Carteira *carteira) {
+    const char nomesPadrao[MAX_ATIVOS][80] = {
+        "Reserva de emergencia (Tesouro Selic/CDB liquidez diaria)",
+        "Renda fixa conservadora (CDB/LCI/LCA/Tesouro Selic)",
+        "Tesouro IPCA+ (protege contra inflacao)",
+        "Fundos imobiliarios - FIIs (renda mensal)",
+        "ETFs de acoes (diversificacao na bolsa)",
+        "Caixa para objetivos curtos e oportunidades"
+    };
+    int i;
 
-    carteira->quantidade = 4;
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        strcpy(carteira->nomes[i], nomesPadrao[i]);
+        carteira->precos[i] = 1.0;
+        carteira->quantidades[i] = 0.0;
+        carteira->valoresAtuais[i] = 0.0;
+        carteira->pesos[i] = 0.0;
+    }
 
-    strcpy(carteira->nomes[0], "Acoes");
-    strcpy(carteira->nomes[1], "Renda Fixa");
-    strcpy(carteira->nomes[2], "Fundos");
-    strcpy(carteira->nomes[3], "Cripto");
-
-    carteira->valores[0] = 4000.00;
-    carteira->valores[1] = 3000.00;
-    carteira->valores[2] = 2000.00;
-    carteira->valores[3] = 1000.00;
-
-    carteira->metas[0] = 40.00;
-    carteira->metas[1] = 30.00;
-    carteira->metas[2] = 20.00;
-    carteira->metas[3] = 10.00;
-
-    carteira->configurada = 1;
+    carteira->preenchida = 0;
 }
 
-void cadastrarUsuario(Usuario *usuario) {
+void cadastrarOrcamento(Orcamento *orcamento, const char categorias[MAX_GASTOS][30]) {
     int i;
 
     limparTela();
-    printf("============================================================\n");
-    printf("             CADASTRO FINANCEIRO DO USUARIO\n");
-    printf("============================================================\n");
+    printf("================ ORCAMENTO MENSAL ================\n");
+    printf("Informe seu nome, idade, renda e gastos. Use ponto para centavos.\n");
+    printf("Exemplo: 2500.50\n\n");
 
-    lerTexto("Nome: ", usuario->nome, TAM_NOME);
-    usuario->idade = lerInteiro("Idade: ", 1, 120);
-    usuario->salario = lerDouble("Quanto recebe de salario por mes (R$): ", 0.0);
+    lerTextoObrigatorio("Nome do usuario: ", orcamento->nome, sizeof(orcamento->nome));
+    orcamento->idade = lerInteiroFaixa("Idade do usuario: ", 1, 120);
+    orcamento->rendaMensal = lerDoubleMinimo("Ganho mensal total: R$ ", 0.0, 0);
+    orcamento->totalGastos = 0.0;
 
-    printf("\nInforme seus gastos mensais por area da vida.\n");
-
-    for (i = 0; i < QTD_GASTOS; i++) {
+    for (i = 0; i < MAX_GASTOS; i++) {
         char mensagem[100];
-        sprintf(mensagem, "Gasto com %s (R$): ", categoriasGastos[i]);
-        usuario->gastos[i] = lerDouble(mensagem, 0.0);
+        snprintf(mensagem, sizeof(mensagem), "Gasto mensal com %s: R$ ", categorias[i]);
+        orcamento->gastos[i] = lerDoubleMinimo(mensagem, 0.0, 1);
+        orcamento->totalGastos += orcamento->gastos[i];
     }
 
-    usuario->economiaMensal = lerDouble("\nQuanto consegue economizar para investir por mes (R$): ", 0.0);
+    orcamento->sobraInvestir = orcamento->rendaMensal - orcamento->totalGastos;
+    orcamento->preenchido = 1;
 
-    while (usuario->economiaMensal > usuario->salario) {
-        printf("A economia mensal nao pode ser maior que o salario.\n");
-        usuario->economiaMensal = lerDouble("Digite novamente a economia mensal (R$): ", 0.0);
+    printf("\nUsuario: %s, %d anos\n", orcamento->nome, orcamento->idade);
+    printf("\nTotal de gastos: R$ %.2f\n", orcamento->totalGastos);
+
+    if (orcamento->sobraInvestir > 0.0) {
+        printf("Sobra mensal para investir: R$ %.2f\n", orcamento->sobraInvestir);
+    } else if (orcamento->sobraInvestir == 0.0) {
+        printf("Voce nao teve sobra este mes. Antes de investir, tente criar margem no orcamento.\n");
+    } else {
+        printf("Alerta: seus gastos passaram da renda em R$ %.2f.\n", valorAbsoluto(orcamento->sobraInvestir));
+        printf("Prioridade: reduzir despesas ou aumentar renda antes de investir.\n");
     }
 
-    usuario->configurado = 1;
-
-    printf("\nDados mensais cadastrados com sucesso.\n");
     pausar();
 }
 
-void cadastrarCarteira(Carteira *carteira) {
-    int i;
-    double somaMetas;
+void escolherPesos(Carteira *carteira) {
+    int opcao;
 
     limparTela();
-    printf("============================================================\n");
-    printf("          CADASTRO DA CARTEIRA DE INVESTIMENTOS\n");
-    printf("============================================================\n");
+    printf("=============== PESOS DA CARTEIRA ===============\n");
+    printf("Os pesos indicam quanto do dinheiro deve ir para cada investimento.\n");
+    printf("A soma obrigatoriamente precisa dar 100%%.\n\n");
+    printf("1 - Perfil conservador (menos risco)\n");
+    printf("2 - Perfil moderado (equilibrado)\n");
+    printf("3 - Perfil arrojado (mais oscilacao)\n");
+    printf("4 - Digitar percentuais manualmente\n");
+    printf("0 - Voltar\n\n");
 
-    carteira->quantidade = lerInteiro("Quantas categorias de investimento deseja cadastrar? (2 a 10): ", 2, MAX_ATIVOS);
+    opcao = lerInteiroFaixa("Escolha uma opcao: ", 0, 4);
+
+    if (opcao == 0) {
+        return;
+    }
+
+    if (opcao >= 1 && opcao <= 3) {
+        definirPerfilAutomatico(carteira, opcao);
+    } else {
+        definirPesosManuais(carteira);
+    }
+
+    carteira->preenchida = 1;
+
+    printf("\nPesos definidos com sucesso:\n");
+    for (opcao = 0; opcao < MAX_ATIVOS; opcao++) {
+        printf("- %-58s %.2f%%\n", carteira->nomes[opcao], carteira->pesos[opcao]);
+    }
+
+    pausar();
+}
+
+void definirPerfilAutomatico(Carteira *carteira, int perfil) {
+    double conservador[MAX_ATIVOS] = {35, 35, 15, 5, 5, 5};
+    double moderado[MAX_ATIVOS] = {25, 25, 20, 10, 15, 5};
+    double arrojado[MAX_ATIVOS] = {20, 15, 20, 15, 25, 5};
+    int i;
+
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        if (perfil == 1) {
+            carteira->pesos[i] = conservador[i];
+        } else if (perfil == 2) {
+            carteira->pesos[i] = moderado[i];
+        } else {
+            carteira->pesos[i] = arrojado[i];
+        }
+    }
+}
+
+void definirPesosManuais(Carteira *carteira) {
+    double soma;
+    int i;
 
     do {
-        somaMetas = 0.0;
+        limparTela();
+        printf("=========== PESOS MANUAIS DA CARTEIRA ===========\n");
+        printf("Digite os percentuais. A soma final deve ser 100%%.\n\n");
 
-        for (i = 0; i < carteira->quantidade; i++) {
-            printf("\nInvestimento %d\n", i + 1);
-
-            lerTexto("Nome da categoria (ex: Acoes, Renda Fixa): ", carteira->nomes[i], TAM_NOME);
-            carteira->valores[i] = lerDouble("Valor atual investido nessa categoria (R$): ", 0.0);
-            carteira->metas[i] = lerDouble("Meta de alocacao para essa categoria (%): ", 0.0);
-
-            somaMetas += carteira->metas[i];
+        for (i = 0; i < MAX_ATIVOS; i++) {
+            char mensagem[130];
+            snprintf(mensagem, sizeof(mensagem), "Percentual para %s: ", carteira->nomes[i]);
+            carteira->pesos[i] = lerDoubleMinimo(mensagem, 0.0, 1);
         }
 
-        if (somaMetas < 100.0 - EPSILON || somaMetas > 100.0 + EPSILON) {
-            printf("\nErro: as metas somaram %.2f%%, mas precisam somar exatamente 100%%.\n", somaMetas);
-            printf("Cadastre novamente as categorias da carteira.\n");
+        soma = somarPesos(carteira);
+
+        if (valorAbsoluto(soma - 100.0) > 0.01) {
+            printf("\nEntrada invalida. A soma dos percentuais foi %.2f%%, mas precisa ser 100%%.\n", soma);
+            printf("Digite novamente todos os pesos.\n");
             pausar();
-            limparTela();
         }
-    } while (somaMetas < 100.0 - EPSILON || somaMetas > 100.0 + EPSILON);
-
-    carteira->configurada = 1;
-
-    printf("\nCarteira cadastrada com sucesso.\n");
-    pausar();
+    } while (valorAbsoluto(soma - 100.0) > 0.01);
 }
 
-double calcularTotalGastos(const Usuario *usuario) {
-    int i;
-    double total = 0.0;
-
-    for (i = 0; i < QTD_GASTOS; i++) {
-        total += usuario->gastos[i];
-    }
-
-    return total;
-}
-
-double calcularSaldoMensal(const Usuario *usuario) {
-    return usuario->salario - calcularTotalGastos(usuario);
-}
-
-double calcularTotalCarteira(const Carteira *carteira) {
-    int i;
-    double total = 0.0;
-
-    for (i = 0; i < carteira->quantidade; i++) {
-        total += carteira->valores[i];
-    }
-
-    return total;
-}
-
-void exibirDiagnosticoFinanceiro(const Usuario *usuario, const Carteira *carteira) {
-    int i;
-    double totalGastos;
-    double saldo;
-    double percentualGastos;
-    double totalCarteira;
-
-    limparTela();
-
-    if (!usuario->configurado) {
-        printf("Cadastre primeiro os dados pessoais e gastos mensais.\n");
-        pausar();
-        return;
-    }
-
-    totalGastos = calcularTotalGastos(usuario);
-    saldo = calcularSaldoMensal(usuario);
-    percentualGastos = usuario->salario > 0.0 ? (totalGastos / usuario->salario) * 100.0 : 0.0;
-
-    printf("============================================================\n");
-    printf("              DIAGNOSTICO FINANCEIRO MENSAL\n");
-    printf("============================================================\n");
-    printf("Nome: %s\n", usuario->nome);
-    printf("Idade: %d anos\n", usuario->idade);
-    printf("Salario mensal: R$ %.2f\n", usuario->salario);
-    printf("Total de gastos: R$ %.2f\n", totalGastos);
-    printf("Saldo apos gastos: R$ %.2f\n", saldo);
-    printf("Economia informada para investir: R$ %.2f\n", usuario->economiaMensal);
-    printf("Percentual do salario comprometido com gastos: %.2f%%\n", percentualGastos);
-
-    printf("\nGastos por area:\n");
-    printf("------------------------------------------------------------\n");
-
-    for (i = 0; i < QTD_GASTOS; i++) {
-        printf("%-15s R$ %10.2f\n", categoriasGastos[i], usuario->gastos[i]);
-    }
-
-    printf("------------------------------------------------------------\n");
-
-    if (saldo < 0.0) {
-        printf("ALERTA: seus gastos estao maiores que sua renda.\n");
-        printf("Sugestao: reduza gastos antes de investir.\n");
-    } else if (usuario->economiaMensal > saldo + EPSILON) {
-        printf("ALERTA: voce informou que investe mais do que sobra no mes.\n");
-        printf("Sugestao: revise os gastos ou reduza o valor destinado a investimentos.\n");
-    } else if (usuario->economiaMensal <= EPSILON) {
-        printf("Sugestao: comece criando uma reserva mensal, mesmo que pequena.\n");
-    } else {
-        printf("Situacao positiva: existe dinheiro mensal disponivel para investir.\n");
-    }
-
-    if (carteira->configurada && metasSomam100(carteira) && usuario->economiaMensal > EPSILON) {
-        printf("\nSugestao de aplicacao da economia mensal conforme sua meta:\n");
-
-        for (i = 0; i < carteira->quantidade; i++) {
-            double valorSugerido = usuario->economiaMensal * (carteira->metas[i] / 100.0);
-            printf("%-15s R$ %10.2f\n", carteira->nomes[i], valorSugerido);
-        }
-    }
-
-    if (carteira->configurada) {
-        totalCarteira = calcularTotalCarteira(carteira);
-        printf("\nPatrimonio atual investido: R$ %.2f\n", totalCarteira);
-    }
-
-    pausar();
-}
-
-void calcularRebalanceamento(const Carteira *carteira, double diferencas[]) {
-    int i;
-    double total = calcularTotalCarteira(carteira);
-    double valorIdeal;
-
-    for (i = 0; i < carteira->quantidade; i++) {
-        valorIdeal = total * (carteira->metas[i] / 100.0);
-        diferencas[i] = valorIdeal - carteira->valores[i];
-    }
-}
-
-void exibirRelatorioRebalanceamento(const Carteira *carteira) {
-    int i;
-    int houveDesvio = 0;
-    double total;
-    double percentualAtual;
-    double desvio;
-    double diferencas[MAX_ATIVOS];
-
-    limparTela();
-
-    if (!carteira->configurada) {
-        printf("Cadastre primeiro a carteira de investimentos.\n");
-        pausar();
-        return;
-    }
-
-    if (!metasSomam100(carteira)) {
-        printf("Erro: as metas cadastradas nao somam 100%%.\n");
-        pausar();
-        return;
-    }
-
-    total = calcularTotalCarteira(carteira);
-
-    if (total <= 0.0) {
-        printf("Nao ha dinheiro investido na carteira para rebalancear.\n");
-        pausar();
-        return;
-    }
-
-    calcularRebalanceamento(carteira, diferencas);
-
-    printf("==========================================================================\n");
-    printf("                  RELATORIO DE REBALANCEAMENTO\n");
-    printf("==========================================================================\n");
-    printf("Patrimonio total investido: R$ %.2f\n\n", total);
-    printf("%-20s %12s %12s %12s %18s\n",
-           "Categoria", "Atual %", "Meta %", "Desvio", "Acao sugerida");
-    printf("--------------------------------------------------------------------------\n");
-
-    for (i = 0; i < carteira->quantidade; i++) {
-        percentualAtual = (carteira->valores[i] / total) * 100.0;
-        desvio = percentualAtual - carteira->metas[i];
-
-        printf("%-20s %11.2f%% %11.2f%% %+11.2f%% ",
-               carteira->nomes[i],
-               percentualAtual,
-               carteira->metas[i],
-               desvio);
-
-        if (diferencas[i] > EPSILON) {
-            printf("COMPRAR R$ %9.2f\n", diferencas[i]);
-            houveDesvio = 1;
-        } else if (diferencas[i] < -EPSILON) {
-            printf("VENDER  R$ %9.2f\n", -diferencas[i]);
-            houveDesvio = 1;
-        } else {
-            printf("MANTER\n");
-        }
-    }
-
-    printf("--------------------------------------------------------------------------\n");
-
-    if (houveDesvio) {
-        printf("Alerta de desvio! Execute as compras e vendas acima para voltar a meta.\n");
-    } else {
-        printf("Carteira equilibrada. Nenhum rebalanceamento necessario.\n");
-    }
-
-    pausar();
-}
-
-void simularQueda(Carteira *carteira) {
-    int categoria;
-    double queda;
-    double valorAntes;
-
-    limparTela();
-
-    if (!carteira->configurada) {
-        printf("Cadastre primeiro a carteira de investimentos.\n");
-        pausar();
-        return;
-    }
-
-    printf("============================================================\n");
-    printf("              SIMULACAO DE QUEDA DE MERCADO\n");
-    printf("============================================================\n");
-
-    categoria = escolherAtivo(carteira);
-    queda = lerDouble("Digite o percentual de queda da categoria escolhida (%): ", 0.0);
-
-    while (queda > 100.0) {
-        printf("A queda nao pode ser maior que 100%%.\n");
-        queda = lerDouble("Digite novamente o percentual de queda (%): ", 0.0);
-    }
-
-    valorAntes = carteira->valores[categoria];
-    carteira->valores[categoria] = carteira->valores[categoria] * (1.0 - queda / 100.0);
-
-    limparTela();
-    printf("Simulacao aplicada: %s caiu %.2f%%.\n", carteira->nomes[categoria], queda);
-    printf("Valor anterior: R$ %.2f\n", valorAntes);
-    printf("Valor atual:    R$ %.2f\n\n", carteira->valores[categoria]);
-    printf("Agora o programa vai gerar o relatorio de rebalanceamento.\n");
-
-    pausar();
-    exibirRelatorioRebalanceamento(carteira);
-}
-
-int escolherAtivo(const Carteira *carteira) {
-    int i;
-    int escolha;
-
-    printf("\nCategorias disponiveis:\n");
-
-    for (i = 0; i < carteira->quantidade; i++) {
-        printf("%d - %s (R$ %.2f)\n", i + 1, carteira->nomes[i], carteira->valores[i]);
-    }
-
-    escolha = lerInteiro("\nEscolha a categoria: ", 1, carteira->quantidade);
-    return escolha - 1;
-}
-
-int metasSomam100(const Carteira *carteira) {
-    int i;
+double somarPesos(const Carteira *carteira) {
     double soma = 0.0;
+    int i;
 
-    for (i = 0; i < carteira->quantidade; i++) {
-        soma += carteira->metas[i];
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        soma += carteira->pesos[i];
     }
 
-    return soma >= 100.0 - EPSILON && soma <= 100.0 + EPSILON;
+    return soma;
 }
 
-void exibirRequisitosAcademicos(void) {
+void cadastrarCarteiraAtual(Carteira *carteira) {
+    int i;
+    double totalAtual = 0.0;
+
     limparTela();
-    printf("============================================================\n");
-    printf("             REQUISITOS TECNICOS DO TRABALHO teste\n");
-    printf("============================================================\n");
-    printf("1. Estruturas Condicionais\n");
-    printf("   - if/else: usado nas validacoes, alertas e relatorios.\n");
-    printf("   - switch: usado para controlar as opcoes do menu principal.\n\n");
+    printf("=============== CARTEIRA ATUAL ===============\n");
+    printf("Nesta parte, informe quanto dinheiro voce JA TEM em cada tipo de investimento.\n");
+    printf("Nao precisa saber preco de cota, quantidade ou termos de corretora.\n");
+    printf("Digite apenas o valor total em reais.\n\n");
+    printf("Exemplos:\n");
+    printf("- Tenho R$ 500 em Tesouro Selic: digite 500\n");
+    printf("- Tenho R$ 120 em FIIs: digite 120\n");
+    printf("- Ainda nao tenho esse investimento: digite 0\n\n");
 
-    printf("2. Estruturas de Repeticao\n");
-    printf("   - for: usado para percorrer gastos e investimentos.\n");
-    printf("   - while: usado para validar entradas incorretas.\n");
-    printf("   - do/while: usado para manter o menu ativo ate o usuario sair.\n\n");
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        char mensagem[170];
 
-    printf("3. Modularizacao com Funcoes\n");
-    printf("   - menuPrincipal(), cadastrarUsuario(), cadastrarCarteira(),\n");
-    
-    printf("     exibirRelatorioRebalanceamento() e simularQueda().\n\n");
+        snprintf(mensagem, sizeof(mensagem), "Quanto voce ja tem em %s? R$ ", carteira->nomes[i]);
+        carteira->valoresAtuais[i] = lerDoubleMinimo(mensagem, 0.0, 1);
 
-    printf("4. Estruturas de Dados\n");
-    printf("   - vetor gastos[]: armazena gastos mensais por area da vida.\n");
-    printf("   - vetor valores[]: armazena o valor atual de cada investimento.\n");
-    printf("   - vetor metas[]: armazena o percentual ideal de cada investimento.\n");
-    printf("   - matriz nomes[][]: armazena os nomes das categorias da carteira.\n");
-    printf("============================================================\n");
+        carteira->precos[i] = carteira->valoresAtuais[i];
+        carteira->quantidades[i] = carteira->valoresAtuais[i] > 0.0 ? 1.0 : 0.0;
+        totalAtual += carteira->valoresAtuais[i];
+    }
+
+    printf("\nCarteira atual cadastrada com sucesso.\n");
+    printf("Total que voce ja possui investido: R$ %.2f\n", totalAtual);
+
+    if (totalAtual == 0.0) {
+        printf("Tudo bem se voce ainda nao tem investimentos. O simulador vai usar sua sobra mensal para sugerir os primeiros aportes.\n");
+    } else {
+        printf("Esses valores serao comparados com os percentuais da opcao 2 para mostrar o rebalanceamento.\n");
+    }
 
     pausar();
+}
+
+void exibirResumo(const Orcamento *orcamento, const Carteira *carteira, const char categorias[MAX_GASTOS][30]) {
+    int i;
+
+    limparTela();
+    printf("===================== RESUMO GERAL =====================\n");
+
+    if (!orcamento->preenchido) {
+        printf("Orcamento ainda nao cadastrado. Use a opcao 1 primeiro.\n");
+        pausar();
+        return;
+    }
+
+    printf("Usuario: %s\n", orcamento->nome);
+    printf("Idade:          %d anos\n", orcamento->idade);
+    printf("Renda mensal:       R$ %.2f\n", orcamento->rendaMensal);
+    printf("Total de gastos:    R$ %.2f\n", orcamento->totalGastos);
+    printf("Sobra para investir:");
+
+    if (orcamento->sobraInvestir > 0.0) {
+        printf(" R$ %.2f\n\n", orcamento->sobraInvestir);
+    } else {
+        printf(" R$ %.2f\n\n", orcamento->sobraInvestir);
+        printf("Como nao houve sobra positiva, o ideal e ajustar o orcamento antes de investir.\n\n");
+    }
+
+    printf("Gastos por area:\n");
+    for (i = 0; i < MAX_GASTOS; i++) {
+        double percentual = 0.0;
+        if (orcamento->rendaMensal > 0.0) {
+            percentual = (orcamento->gastos[i] / orcamento->rendaMensal) * 100.0;
+        }
+        printf("- %-12s R$ %10.2f (%6.2f%% da renda)\n", categorias[i], orcamento->gastos[i], percentual);
+    }
+
+    if (orcamento->sobraInvestir <= 0.0) {
+        pausar();
+        return;
+    }
+
+    if (!carteira->preenchida || valorAbsoluto(somarPesos(carteira) - 100.0) > 0.01) {
+        printf("\nPesos da carteira ainda nao cadastrados. Use a opcao 2.\n");
+        pausar();
+        return;
+    }
+
+    printf("\nSugestao simples para investir a sobra mensal:\n");
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        double aporte = orcamento->sobraInvestir * carteira->pesos[i] / 100.0;
+        printf("- %-58s R$ %10.2f (%5.2f%%)\n", carteira->nomes[i], aporte, carteira->pesos[i]);
+    }
+
+    simularRebalanceamento(orcamento, carteira);
+    pausar();
+}
+
+void simularRebalanceamento(const Orcamento *orcamento, const Carteira *carteira) {
+    double totalAtual = 0.0;
+    double totalProjetado;
+    int i;
+
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        totalAtual += carteira->valoresAtuais[i];
+    }
+
+    if (totalAtual <= 0.0) {
+        printf("\nVoce ainda nao cadastrou valores atuais na carteira.\n");
+        printf("Mesmo assim, a divisao acima ja mostra quanto investir em cada item por mes.\n");
+        return;
+    }
+
+    totalProjetado = totalAtual + orcamento->sobraInvestir;
+
+    printf("\n================ REBALANCEAMENTO ================\n");
+    printf("Carteira atual: R$ %.2f\n", totalAtual);
+    printf("Carteira depois do novo aporte: R$ %.2f\n\n", totalProjetado);
+    printf("%-58s %12s %12s %18s\n", "Investimento", "Atual", "Ideal", "Acao sugerida");
+    printf("------------------------------------------------------------------------------------------------\n");
+
+    for (i = 0; i < MAX_ATIVOS; i++) {
+        double valorIdeal = totalProjetado * carteira->pesos[i] / 100.0;
+        double diferenca = valorIdeal - carteira->valoresAtuais[i];
+
+        printf("%-58s R$ %9.2f R$ %9.2f ", carteira->nomes[i], carteira->valoresAtuais[i], valorIdeal);
+
+        if (diferenca > 0.01) {
+            printf("Aportar R$ %.2f\n", diferenca);
+        } else if (diferenca < -0.01) {
+            printf("Pausar aporte. Excesso de R$ %.2f\n", valorAbsoluto(diferenca));
+        } else {
+            printf("Manter\n");
+        }
+    }
+
+    printf("\nLeitura para leigos:\n");
+    printf("- Aportar significa colocar mais dinheiro no item que esta abaixo da meta.\n");
+    printf("- Pausar aporte significa que o item esta acima da meta. Iniciantes podem apenas nao colocar dinheiro nele por enquanto.\n");
+    printf("- Nunca invista dinheiro da reserva de emergencia em produtos de alto risco.\n");
+}
+
+void exibirAjudaInvestimentos(void) {
+    limparTela();
+    printf("================ AJUDA PARA LEIGOS ================\n");
+    printf("Este programa nao substitui um profissional, mas ajuda a organizar ideias.\n\n");
+
+    printf("1. Reserva de emergencia\n");
+    printf("   Primeiro passo. Deve ficar em algo seguro e com liquidez diaria.\n");
+    printf("   Exemplos: Tesouro Selic, CDB com liquidez diaria e fundo DI simples.\n");
+    printf("   Objetivo: cobrir de 3 a 6 meses de gastos essenciais.\n\n");
+
+    printf("2. Renda fixa conservadora\n");
+    printf("   Boa para quem esta comecando e quer previsibilidade.\n");
+    printf("   Exemplos: CDB, LCI, LCA e Tesouro Selic. Compare rentabilidade, prazo e garantia do FGC.\n\n");
+
+    printf("3. Tesouro IPCA+\n");
+    printf("   Ajuda a proteger o dinheiro da inflacao no longo prazo.\n");
+    printf("   Pode oscilar antes do vencimento, entao combina melhor com objetivos distantes.\n\n");
+
+    printf("4. Fundos imobiliarios (FIIs)\n");
+    printf("   Sao negociados na bolsa e podem pagar rendimentos mensais.\n");
+    printf("   Possuem risco de mercado, vacancia, gestao e mudanca nos rendimentos.\n\n");
+
+    printf("5. ETFs de acoes\n");
+    printf("   Sao fundos negociados em bolsa que compram varias acoes de uma vez.\n");
+    printf("   Servem para diversificar sem escolher empresa por empresa, mas oscilam bastante.\n\n");
+
+    printf("Regra simples para iniciantes:\n");
+    printf("- Quite dividas caras antes de investir.\n");
+    printf("- Monte reserva de emergencia antes de correr risco.\n");
+    printf("- Invista todo mes, mesmo pouco.\n");
+    printf("- Rebalanceie quando um investimento ficar muito acima ou abaixo da meta.\n");
+    printf("- Desconfie de promessa de ganho rapido e garantido.\n");
+
+    pausar();
+}
+
+double valorAbsoluto(double valor) {
+    if (valor < 0.0) {
+        return -valor;
+    }
+
+    return valor;
 }
