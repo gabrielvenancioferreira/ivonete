@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <errno.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,9 @@ typedef struct {
     int preenchida;
 } Carteira;
 
+static jmp_buf retornoMenuContexto;
+static int atalhoMenuHabilitado = 0;
+
 void limparTela(void);
 void pausar(void);
 int menuPrincipal(void);
@@ -44,6 +48,8 @@ void exibirResumo(const Orcamento *orcamento, const Carteira *carteira, const ch
 void simularRebalanceamento(const Orcamento *orcamento, const Carteira *carteira);
 void exibirAjudaInvestimentos(void);
 double valorAbsoluto(double valor);
+int entradaSolicitaMenu(const char *linha);
+void exibirAtalhoMenu(void);
 
 int main(void) {
     const char categorias[MAX_GASTOS][30] = {
@@ -64,6 +70,14 @@ int main(void) {
 
     do {
         opcao = menuPrincipal();
+
+        if (opcao >= 1 && opcao <= 5) {
+            atalhoMenuHabilitado = 1;
+            if (setjmp(retornoMenuContexto) != 0) {
+                atalhoMenuHabilitado = 0;
+                continue;
+            }
+        }
 
         switch (opcao) {
             case 1:
@@ -90,6 +104,8 @@ int main(void) {
                 pausar();
                 break;
         }
+
+        atalhoMenuHabilitado = 0;
     } while (opcao != 0);
 
     return 0;
@@ -106,8 +122,15 @@ void limparTela(void) {
 void pausar(void) {
     char linha[TAM_LINHA];
 
-    printf("\nPressione ENTER para continuar...");
-    fgets(linha, sizeof(linha), stdin);
+    if (atalhoMenuHabilitado) {
+        printf("\nPressione ENTER para continuar (ou digite MENU para voltar ao menu principal)...");
+    } else {
+        printf("\nPressione ENTER para continuar...");
+    }
+
+    if (fgets(linha, sizeof(linha), stdin) != NULL && atalhoMenuHabilitado && entradaSolicitaMenu(linha)) {
+        longjmp(retornoMenuContexto, 1);
+    }
 }
 
 int menuPrincipal(void) {
@@ -138,6 +161,10 @@ int lerInteiroFaixa(const char *mensagem, int minimo, int maximo) {
             printf("Entrada invalida. Tente novamente.\n");
             clearerr(stdin);
             continue;
+        }
+
+        if (atalhoMenuHabilitado && entradaSolicitaMenu(linha)) {
+            longjmp(retornoMenuContexto, 1);
         }
 
         errno = 0;
@@ -176,6 +203,10 @@ double lerDoubleMinimo(const char *mensagem, double minimo, int permiteIgual) {
             continue;
         }
 
+        if (atalhoMenuHabilitado && entradaSolicitaMenu(linha)) {
+            longjmp(retornoMenuContexto, 1);
+        }
+
         errno = 0;
         valor = strtod(linha, &fim);
 
@@ -210,6 +241,10 @@ void lerTextoObrigatorio(const char *mensagem, char *destino, size_t tamanho) {
             printf("Entrada invalida. Tente novamente.\n");
             clearerr(stdin);
             continue;
+        }
+
+        if (atalhoMenuHabilitado && entradaSolicitaMenu(linha)) {
+            longjmp(retornoMenuContexto, 1);
         }
 
         linha[strcspn(linha, "\n")] = '\0';
@@ -268,6 +303,8 @@ void cadastrarOrcamento(Orcamento *orcamento, const char categorias[MAX_GASTOS][
     printf("================ ORCAMENTO MENSAL ================\n");
     printf("Informe seu nome, idade, renda e gastos. Use ponto para centavos.\n");
     printf("Exemplo: 2500.50\n\n");
+    exibirAtalhoMenu();
+    printf("\n");
 
     lerTextoObrigatorio("Nome do usuario: ", orcamento->nome, sizeof(orcamento->nome));
     orcamento->idade = lerInteiroFaixa("Idade do usuario: ", 1, 120);
@@ -306,6 +343,8 @@ void escolherPesos(Carteira *carteira) {
     printf("=============== PESOS DA CARTEIRA ===============\n");
     printf("Os pesos indicam quanto do dinheiro deve ir para cada investimento.\n");
     printf("A soma obrigatoriamente precisa dar 100%%.\n\n");
+    exibirAtalhoMenu();
+    printf("\n");
     printf("1 - Perfil conservador (menos risco)\n");
     printf("2 - Perfil moderado (equilibrado)\n");
     printf("3 - Perfil arrojado (mais oscilacao)\n");
@@ -359,6 +398,8 @@ void definirPesosManuais(Carteira *carteira) {
         limparTela();
         printf("=========== PESOS MANUAIS DA CARTEIRA ===========\n");
         printf("Digite os percentuais. A soma final deve ser 100%%.\n\n");
+        exibirAtalhoMenu();
+        printf("\n");
 
         for (i = 0; i < MAX_ATIVOS; i++) {
             char mensagem[130];
@@ -396,6 +437,8 @@ void cadastrarCarteiraAtual(Carteira *carteira) {
     printf("Nesta parte, informe quanto dinheiro voce JA TEM em cada tipo de investimento.\n");
     printf("Nao precisa saber preco de cota, quantidade ou termos de corretora.\n");
     printf("Digite apenas o valor total em reais.\n\n");
+    exibirAtalhoMenu();
+    printf("\n");
     printf("Exemplos:\n");
     printf("- Tenho R$ 500 em Tesouro Selic: digite 500\n");
     printf("- Tenho R$ 120 em FIIs: digite 120\n");
@@ -429,6 +472,8 @@ void exibirResumo(const Orcamento *orcamento, const Carteira *carteira, const ch
 
     limparTela();
     printf("===================== RESUMO GERAL =====================\n");
+    exibirAtalhoMenu();
+    printf("\n");
 
     if (!orcamento->preenchido) {
         printf("Orcamento ainda nao cadastrado. Use a opcao 1 primeiro.\n");
@@ -527,6 +572,8 @@ void exibirAjudaInvestimentos(void) {
     limparTela();
     printf("================ AJUDA PARA LEIGOS ================\n");
     printf("Este programa nao substitui um profissional, mas ajuda a organizar ideias.\n\n");
+    exibirAtalhoMenu();
+    printf("\n");
 
     printf("1. Reserva de emergencia\n");
     printf("   Primeiro passo. Deve ficar em algo seguro e com liquidez diaria.\n");
@@ -565,4 +612,31 @@ double valorAbsoluto(double valor) {
     }
 
     return valor;
+}
+
+int entradaSolicitaMenu(const char *linha) {
+    char texto[TAM_LINHA];
+    size_t i = 0;
+    size_t j = 0;
+
+    while (linha[i] != '\0' && isspace((unsigned char)linha[i])) {
+        i++;
+    }
+
+    while (linha[i] != '\0' && linha[i] != '\n' && j < TAM_LINHA - 1) {
+        texto[j] = (char)tolower((unsigned char)linha[i]);
+        i++;
+        j++;
+    }
+
+    while (j > 0 && isspace((unsigned char)texto[j - 1])) {
+        j--;
+    }
+    texto[j] = '\0';
+
+    return strcmp(texto, "menu") == 0 || strcmp(texto, "m") == 0 || strcmp(texto, "voltar") == 0;
+}
+
+void exibirAtalhoMenu(void) {
+    printf("Atalho: digite MENU e pressione ENTER para retornar ao menu principal.");
 }
