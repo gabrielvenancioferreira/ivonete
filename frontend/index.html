@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulador de Carteira e Rebalanceamento</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape shape-1" aria-hidden="true"></div>
+    <div class="bg-shape shape-2" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <header class="hero">
+        <p class="kicker">Backend C + API REST JSON</p>
+        <h1>Simulador de Carteira de Investimentos e Rebalanceamento</h1>
+        <p class="subtitle">
+          Frontend desacoplado com integracao HTTP, validacoes e atualizacao em tempo real.
+        </p>
+      </header>
+
+      <section class="menu-board" aria-label="Menu principal">
+        <div class="menu-line"></div>
+        <p>SIMULADOR DE CARTEIRA DE INVESTIMENTOS E REBALANCEAMENTO</p>
+        <div class="menu-line"></div>
+        <ul class="menu-options">
+          <li>1 - Informar ganho mensal e ver plano ideal</li>
+          <li>2 - Definir pesos percentuais da carteira</li>
+          <li>3 - Informar valores que ja tenho investidos</li>
+          <li>4 - Ver resumo, valor para investir e rebalanceamento</li>
+          <li>5 - Ajuda para leigos: tipos de investimento</li>
+          <li>0 - Sair</li>
+        </ul>
+        <div class="menu-line"></div>
+      </section>
+
+      <section class="status-bar" aria-live="polite">
+        <div>
+          <strong>API:</strong>
+          <span id="api-base-url"></span>
+        </div>
+        <div id="feedback" class="feedback neutral">
+          Pronto para carregar dados.
+        </div>
+      </section>
+
+      <div class="grid-layout">
+        <section class="card">
+          <h2>1) Ganho Mensal e Plano Ideal</h2>
+          <form id="planner-form" class="stack">
+            <label>
+              Nome do investidor
+              <input type="text" id="investor-name" required maxlength="80" placeholder="Ex: Maria Silva" />
+            </label>
+            <label>
+              Ganho mensal (R$)
+              <input type="number" id="monthly-income" min="0" step="0.01" required placeholder="Ex: 8500" />
+            </label>
+            <button type="submit" class="btn btn-primary">Gerar plano ideal</button>
+          </form>
+          <div id="ideal-plan" class="result-box"></div>
+        </section>
+
+        <section class="card">
+          <h2>2) Definir Pesos da Carteira (%)</h2>
+          <form id="weights-form" class="stack">
+            <div class="two-columns">
+              <label>Renda fixa (%)<input type="number" name="rendaFixa" min="0" max="100" step="0.1" required /></label>
+              <label>Acoes (%)<input type="number" name="acoes" min="0" max="100" step="0.1" required /></label>
+              <label>FIIs (%)<input type="number" name="fiis" min="0" max="100" step="0.1" required /></label>
+              <label>Exterior (%)<input type="number" name="exterior" min="0" max="100" step="0.1" required /></label>
+              <label>Reserva (%)<input type="number" name="reserva" min="0" max="100" step="0.1" required /></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Aplicar pesos</button>
+          </form>
+          <p id="weights-total" class="hint"></p>
+        </section>
+
+        <section class="card">
+          <h2>3) Valores Ja Investidos (R$)</h2>
+          <form id="current-form" class="stack">
+            <div class="two-columns">
+              <label>Renda fixa (R$)<input type="number" name="rendaFixa" min="0" step="0.01" required /></label>
+              <label>Acoes (R$)<input type="number" name="acoes" min="0" step="0.01" required /></label>
+              <label>FIIs (R$)<input type="number" name="fiis" min="0" step="0.01" required /></label>
+              <label>Exterior (R$)<input type="number" name="exterior" min="0" step="0.01" required /></label>
+              <label>Reserva (R$)<input type="number" name="reserva" min="0" step="0.01" required /></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Salvar valores atuais</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>4) Resumo e Rebalanceamento</h2>
+          <button id="rebalance-btn" class="btn btn-accent" type="button">Calcular rebalanceamento</button>
+          <div id="summary" class="result-box"></div>
+        </section>
+
+        <section class="card">
+          <h2>5) Ajuda para Leigos</h2>
+          <div class="help-list">
+            <article>
+              <h3>Renda fixa</h3>
+              <p>Geralmente mais estavel. Exemplos: Tesouro Direto, CDB e LCI/LCA.</p>
+            </article>
+            <article>
+              <h3>Acoes</h3>
+              <p>Participacao em empresas. Maior potencial de retorno, com mais volatilidade.</p>
+            </article>
+            <article>
+              <h3>FIIs</h3>
+              <p>Fundos imobiliarios negociados em bolsa, focados em renda de imoveis e ativos ligados ao setor.</p>
+            </article>
+            <article>
+              <h3>Exterior</h3>
+              <p>Investimentos fora do Brasil para diversificacao geografica e cambial.</p>
+            </article>
+            <article>
+              <h3>Reserva</h3>
+              <p>Parte liquida e segura para emergencias e oportunidades.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <section class="card full-width">
+        <h2>Integracao com Backend C (CRUD de Usuarios)</h2>
+        <form id="user-form" class="inline-form">
+          <input id="user-name" type="text" maxlength="80" required placeholder="Nome do usuario (POST /usuarios)" />
+          <button class="btn btn-primary" type="submit">Cadastrar usuario</button>
+          <button id="refresh-users" class="btn btn-ghost" type="button">Atualizar lista (GET)</button>
+        </form>
+        <div id="users-container"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
